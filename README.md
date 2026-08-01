@@ -1,14 +1,14 @@
 # Factors that Lead to Attrition at IBM
 
-An end-to-end machine learning case study identifying which employees are at risk of leaving IBM and why — using cluster analysis to segment employee profiles and logistic regression to quantify the drivers of turnover.
+An end-to-end machine learning case study identifying which employees are at risk of leaving and why — using cluster analysis to segment employee profiles and logistic regression to quantify the drivers of turnover.
 
 ## Business Problem
 
-Employee replacement costs typically run 50%–200% of an employee's annual salary (SHRM). Applied to this dataset's 237 departed employees, that translates to an estimated **$6.8M–$27.2M** in replacement costs. The goal of this analysis is to understand which factors — tenure, department, compensation, and others — are associated with turnover, so at-risk employees can be identified and targeted for retention interventions.
+Employee replacement costs typically run 50%–200% of an employee's annual salary (SHRM). Applied to this dataset's 237 departed employees, that translates to an estimated **$6.8M–$27.2M** in replacement costs ($28,723–$114,890 per employee). The goal of this analysis is to understand which factors — tenure, department, compensation, and others — are associated with turnover, so at-risk employees can be identified and targeted for retention interventions.
 
 ## Dataset
 
-[IBM HR Analytics Employee Attrition & Performance](https://www.kaggle.com/datasets/pavansubhasht/ibm-hr-analytics-attrition-dataset) (`WA_Fn-UseC_-HR-Employee-Attrition.csv`) — 1,470 employees, 35 features covering demographics, compensation, job role, satisfaction, and tenure.
+[IBM HR Analytics Employee Attrition & Performance](https://www.kaggle.com/datasets/pavansubhasht/ibm-hr-analytics-attrition-dataset) (`WA_Fn-UseC_-HR-Employee-Attrition.csv`) — 1,470 employees, 35 columns covering demographics, compensation, job role, satisfaction, and tenure. This is a synthetic dataset created by IBM data scientists for analytics training. The attrition rate is 16.1% (237 of 1,470), which introduces a class imbalance addressed later in the modeling.
 
 ## Approach
 
@@ -21,22 +21,32 @@ The analysis uses two complementary methods:
 Quantify the cost of attrition and frame the business question.
 
 ### Phase 2: Data Preprocessing and Exploration
-- 1,470 rows, 36 columns; no missing values, no meaningful outliers
+- 1,470 rows, 35 columns; no missing values, no meaningful outliers
 - Dropped `StandardHours` and `Over18` (constant across all employees, no analytical value)
-- Converted categorical fields to ordered categories and created dummy variables
+- Converted categorical fields to ordered categories and created dummy variables (`drop_first=True`)
 - Standardized numeric features (z-score) ahead of clustering
 
 ### Phase 3: Machine Learning Models
 
-**Cluster Analysis**
-- Built dendrograms across six linkage methods (Ward, Complete, Average, Weighted, Single, Centroid, Median) and evaluated cluster structure via heatmaps, centroids, and silhouette scores
-- Selected **Ward linkage** (3 clusters) as the primary model, cross-validated against **K-Means** — both methods converged on nearly identical employee groupings
-- Clusters resolved cleanly into career-stage profiles: **Junior**, **Mid-Career**, and **Senior**, differentiated by age, income, tenure, and total experience
-- **Finding:** Junior employees have the highest attrition rate (~20%), roughly double that of Mid-Career and Senior employees — representing ~175–185 at-risk employees
+**Cluster Analysis** — performed on 14 standardized numeric features (age, compensation, tenure, and experience measures).
+
+- Built truncated dendrograms across seven linkage methods (Ward, Complete, Average, Weighted, Single, Centroid, Median). Single, Centroid, and Median produced chained or single-employee branches and were eliminated; Average and Weighted also showed individual-employee branches
+- Compared the two survivors, **Ward** and **Complete**, via silhouette scores (0.1153 vs. 0.1210) and clustered heatmaps. Ward was selected on the strength of cleaner visual cluster separation despite the marginally lower score
+- Cross-validated with **K-Means** (k=3, chosen via elbow plot; silhouette 0.1410). The two methods converged on nearly identical groupings
+- Clusters resolved into career-stage profiles — **Junior**, **Mid-Career**, and **Senior** — differentiated by age, income, tenure, and total experience
+
+| Metric | Ward Linkage | K-Means |
+|---|---|---|
+| Silhouette Score | 0.1153 | 0.1410 |
+| Junior members / attrition | 859 / 176 (20.5%) | 842 / 175 (20.8%) |
+| Mid-Career members / attrition | 416 / 39 (9.4%) | 409 / 44 (10.7%) |
+| Senior members / attrition | 195 / 22 (11.3%) | 219 / 18 (8.2%) |
+
+**Finding:** Junior employees churn at roughly twice the rate of the other two segments — about 175 departures — making them the clearest target for retention effort.
 
 **Logistic Regression**
-- Checked multicollinearity via VIF (all values moderate; no features dropped)
-- Compared two training strategies: a standard 60/40 train/validation split vs. an oversampled 50/50 split to correct for class imbalance
+- Checked multicollinearity via VIF (all values below 5, highest being `TotalWorkingYears` at 4.65); no features dropped
+- Compared two training strategies: a standard 60/40 train/validation split vs. an oversampled training set balanced 50/50 between leavers and stayers
 
 | Metric | Standard Split | Oversampled |
 |---|---|---|
@@ -46,14 +56,14 @@ Quantify the cost of attrition and frame the business question.
 | Specificity | 96.3% | 76.3% |
 | AUC | 0.84 | 0.81 |
 
-The **oversampled model** was selected as final despite lower accuracy, because missing a true flight risk is costlier than a false alarm — nearly doubling recall (68% vs. 36%) was judged worth the precision trade-off.
+The **oversampled model** was selected as final despite lower headline accuracy. The standard model was excellent at confirming who would stay but caught barely a third of actual leavers. Since a missed flight risk costs far more than a false alarm, nearly doubling recall was worth the precision trade-off.
 
 ### Phase 4: Model Evaluation Summary
-Cluster and classification results were cross-checked against each other for consistency (e.g., junior-cluster membership vs. logistic-regression risk scores), reinforcing confidence in the findings.
+Documents the model-selection rationale on both tracks: why Ward was chosen over Complete linkage and how K-Means independently corroborated it, and why the oversampled regression was preferred over the higher-accuracy standard split.
 
 ### Phase 5: Deployment and Insights
 
-**Top drivers of attrition:**
+**Top drivers of attrition (final model coefficients):**
 
 | Variable | Coefficient | Direction |
 |---|---|---|
@@ -66,10 +76,10 @@ Cluster and classification results were cross-checked against each other for con
 | Environment Satisfaction | −0.19 | Lower risk |
 
 **Key takeaways:**
-- **Overtime is the #1 controllable risk factor.**
-- Sales and Marketing-background employees show elevated attrition — worth further investigation.
-- Reducing unnecessary travel and improving workplace environment satisfaction are practical retention levers.
-- ~23% of employees (285) were flagged as at-risk, with Junior-tier employees over-represented — the model output includes a ranked, actionable list of at-risk employees for targeted intervention.
+- **Overtime is the #1 risk factor — and it is controllable.** Workload balancing is the highest-leverage intervention available.
+- Reducing unnecessary travel and improving environment satisfaction are the other two practical, controllable levers.
+- Sales and Marketing-background employees show elevated attrition; the model flags the pattern but not the cause, so this warrants qualitative follow-up before acting.
+- Applying a 0.5 probability threshold to the 1,233 currently active employees flags **285 (23%) as at-risk**, again concentrated in the Junior tier. The notebook outputs a ranked list of these employees with their contributing factors — an actionable target list for HR intervention.
 
 ## Tech Stack
 
@@ -80,16 +90,32 @@ Cluster and classification results were cross-checked against each other for con
 
 ## Repository Contents
 
-- `Attrition_at_IBM.ipynb` — main analysis notebook (run cells sequentially to reproduce results)
+- `Attrition_at_IBM.ipynb` — main analysis notebook
 - `WA_Fn-UseC_-HR-Employee-Attrition.csv` — source dataset
+
+## Running the Analysis
+
+```bash
+pip install numpy pandas matplotlib seaborn scikit-learn scipy statsmodels dmba
+jupyter notebook Attrition_at_IBM.ipynb
+```
+
+Run cells sequentially to reproduce all results. Random seeds are fixed (`random_state=0` for K-Means, `random_state=1` for train/test splits), so output is deterministic.
 
 ## Skills Demonstrated
 
 - End-to-end analytical workflow: problem framing → EDA → modeling → evaluation → business recommendations
-- Unsupervised learning (hierarchical and K-Means clustering, silhouette analysis, dendrogram interpretation)
-- Supervised learning (logistic regression, multicollinearity diagnostics via VIF)
-- Handling class imbalance via oversampling and making an explicit precision/recall trade-off decision tied to business cost
-- Model interpretation and translating coefficients into concrete business recommendations
+- Unsupervised learning: hierarchical and K-Means clustering, linkage method comparison, dendrogram and heatmap interpretation, silhouette analysis
+- Supervised learning: logistic regression, multicollinearity diagnostics, ROC/AUC and confusion matrix evaluation
+- Handling class imbalance via stratified oversampling, with an explicit precision/recall trade-off justified by business cost rather than by accuracy alone
+- Cross-validating unsupervised findings against a second method before trusting them
+- Translating model coefficients into ranked, controllable business recommendations
+
+## Limitations
+
+- Silhouette scores are low (0.12–0.14) across all clustering methods, indicating soft cluster boundaries. The segments are supported by dendrogram structure, centroid separation, and agreement between two independent methods rather than by score alone.
+- The dataset is synthetic, so effect sizes should not be read as real-world benchmarks.
+- Coefficients describe association, not causation — particularly for demographic variables such as marital status and gender.
 
 ## References
 
