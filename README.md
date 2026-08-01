@@ -91,9 +91,10 @@ Documents the model-selection rationale on both tracks: why Ward was chosen over
 ## Repository Contents
 
 - `Attrition_at_IBM.ipynb` — main analysis notebook
-- `WA_Fn-UseC_-HR-Employee-Attrition.csv` — source dataset
 
 ## Running the Analysis
+
+Download the attrition dataset from the website provided. Name it WA_Fn-UseC_-HR-Employee-Attrition.csv. Save it in the same directory as the python notebook.
 
 ```bash
 pip install numpy pandas matplotlib seaborn scikit-learn scipy statsmodels dmba
